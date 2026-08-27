@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #F5F1FA;
+    color: #211A2B;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+}
+
+/* Custom Soft Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F5F1FA;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #DCD2E8;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #B99AD7;
+}

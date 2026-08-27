@@ -1,0 +1,14 @@
+{
+  "repository": "https://github.com/genlayerlabs/genlayer-simulator",
+  "issue_url": "https://github.com/genlayerlabs/genlayer-simulator/issues/104",
+  "pr_url": "https://github.com/genlayerlabs/genlayer-simulator/pull/115",
+  "commit_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9a0b1c2d3e",
+  "state": "open",
+  "merged": false,
+  "merged_by": null,
+  "scope_summary": "WIP: initial attempt at reconnect logic",
+  "files_changed": 1,
+  "lines_added": 5,
+  "lines_deleted": 0,
+  "author": "open-source-contributor"
+}
