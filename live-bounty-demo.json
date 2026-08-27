@@ -1,0 +1,14 @@
+{
+  "repository": "https://github.com/Azaria723/OpenSourceMicroBounty",
+  "issue_url": "https://github.com/Azaria723/OpenSourceMicroBounty/issues/1",
+  "pr_url": "https://github.com/Azaria723/OpenSourceMicroBounty/pull/2",
+  "commit_sha": "0123456789abcdef0123456789abcdef01234567",
+  "state": "closed",
+  "merged": true,
+  "merged_by": "repository-maintainer",
+  "scope_summary": "Add a deterministic evidence fixture and document the bounty lifecycle.",
+  "files_changed": 1,
+  "lines_added": 20,
+  "lines_deleted": 0,
+  "author": "open-source-contributor"
+}
