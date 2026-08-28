@@ -83,6 +83,12 @@ class OpenSourceMicroBounty(gl.Contract):
         remainder = clean_issue[len(clean_repo):]
         return remainder.startswith("/issues/") or remainder.startswith("/issue/")
 
+    def _github_repo_slug(self, repo_url: str) -> str:
+        return repo_url.strip()[19:].strip("/")
+
+    def _github_resource_number(self, resource_url: str) -> str:
+        return resource_url.strip().rstrip("/").split("/")[-1]
+
     # -------------------------------------------------------------------------
     # Public Write Methods
     # -------------------------------------------------------------------------
@@ -221,58 +227,66 @@ class OpenSourceMicroBounty(gl.Contract):
         scope_req = self.bounty_scopes[bounty_id]
         pr_url = self.sub_pr_urls[bounty_id]
         expected_commit = self.sub_commit_shas[bounty_id]
-        evidence_url = self.sub_evidence_urls[bounty_id]
-        expected_digest = self.sub_evidence_digests[bounty_id]
+        repo_slug = self._github_repo_slug(repo_url)
+        pr_number = self._github_resource_number(pr_url)
+        issue_number = self._github_resource_number(issue_url)
 
         def evaluate_consensus() -> str:
-            import hashlib
-
             repo_match = "FAIL"
             issue_match = "FAIL"
             merged_status = "FAIL"
+            commit_match = "FAIL"
             scope_match = "FAIL"
             reason_code = "INITIAL"
             verdict = "REJECTED"
             verdict_code = 5  # STATUS_REJECTED
 
-            # 1. Fetch PR / Evidence
+            # Canonical sources are derived by the contract, not supplied by a contributor.
             fetch_ok = False
             try:
-                resp = gl.nondet.web.get(evidence_url)
-                if resp.status == 200 and len(resp.body) <= 5000:
+                pr_api = "https://api.github.com/repos/" + repo_slug + "/pulls/" + pr_number
+                commit_api = "https://api.github.com/repos/" + repo_slug + "/commits/" + expected_commit
+                issue_api = "https://api.github.com/repos/" + repo_slug + "/issues/" + issue_number
+                files_api = pr_api + "/files"
+                pr_resp = gl.nondet.web.get(pr_api)
+                commit_resp = gl.nondet.web.get(commit_api)
+                issue_resp = gl.nondet.web.get(issue_api)
+                files_resp = gl.nondet.web.get(files_api)
+                if (
+                    pr_resp.status == 200 and commit_resp.status == 200
+                    and issue_resp.status == 200 and files_resp.status == 200
+                    and len(pr_resp.body) <= 30000 and len(commit_resp.body) <= 30000
+                    and len(issue_resp.body) <= 30000 and len(files_resp.body) <= 60000
+                ):
                     fetch_ok = True
-                    raw_bytes = resp.body
-                    calc_digest = hashlib.sha256(raw_bytes).hexdigest().lower()
-                    if calc_digest != expected_digest:
-                        return json.dumps({
-                            "repository_match": "FAIL",
-                            "issue_match": "FAIL",
-                            "merged": "FAIL",
-                            "scope_match": "FAIL",
-                            "verdict": "UNAVAILABLE",
-                            "verdict_code": 7,
-                            "reason_code": "EVIDENCE_DIGEST_MISMATCH",
-                        }, sort_keys=True, separators=(",", ":"))
-
-                    data = json.loads(raw_bytes.decode("utf-8"))
-
-                    c_repo = str(data.get("repository", "")).strip().lower()
-                    c_issue = str(data.get("issue_url", "")).strip().lower()
-                    c_pr = str(data.get("pr_url", "")).strip().lower()
-                    c_commit = str(data.get("commit_sha", "")).strip().lower()
-                    c_merged = data.get("merged", False)
-                    c_scope = str(data.get("scope_summary", "")).strip()
-
-                    if c_repo == repo_url.lower():
+                    pr_data = json.loads(pr_resp.body.decode("utf-8"))
+                    commit_data = json.loads(commit_resp.body.decode("utf-8"))
+                    issue_data = json.loads(issue_resp.body.decode("utf-8"))
+                    files_data = json.loads(files_resp.body.decode("utf-8"))
+                    canonical_repo = str(pr_data.get("base", {}).get("repo", {}).get("html_url", "")).rstrip("/").lower()
+                    canonical_pr = str(pr_data.get("html_url", "")).rstrip("/").lower()
+                    canonical_commit = str(commit_data.get("sha", "")).lower()
+                    merge_commit = str(pr_data.get("merge_commit_sha", "")).lower()
+                    head_commit = str(pr_data.get("head", {}).get("sha", "")).lower()
+                    issue_html = str(issue_data.get("html_url", "")).rstrip("/").lower()
+                    pr_text = (str(pr_data.get("title", "")) + " " + str(pr_data.get("body", ""))).lower()
+                    canonical_change_text = pr_text
+                    for changed_file in files_data:
+                        canonical_change_text += " " + str(changed_file.get("filename", "")).lower()
+                        canonical_change_text += " " + str(changed_file.get("patch", "")).lower()
+                    if canonical_repo == repo_url.rstrip("/").lower() and canonical_pr == pr_url.rstrip("/").lower():
                         repo_match = "PASS"
-
-                    if c_issue == issue_url.lower() and c_pr == pr_url.lower():
+                    if issue_html == issue_url.rstrip("/").lower() and ("#" + issue_number) in pr_text:
                         issue_match = "PASS"
-
-                    if c_merged is True and c_commit == expected_commit:
+                    if pr_data.get("merged", False) is True:
                         merged_status = "PASS"
-
-                    if len(c_scope) > 0:
+                    if canonical_commit == expected_commit and expected_commit in [head_commit, merge_commit]:
+                        commit_match = "PASS"
+                    scope_hits = 0
+                    for scope_word in scope_req.strip().lower().replace(".", " ").replace(",", " ").split():
+                        if len(scope_word) >= 5 and scope_word in canonical_change_text:
+                            scope_hits += 1
+                    if len(files_data) > 0 and scope_hits >= 2:
                         scope_match = "PASS"
             except Exception:
                 fetch_ok = False
@@ -286,6 +300,7 @@ class OpenSourceMicroBounty(gl.Contract):
                 repo_match == "PASS"
                 and issue_match == "PASS"
                 and merged_status == "PASS"
+                and commit_match == "PASS"
                 and scope_match == "PASS"
             ):
                 verdict = "APPROVED"
@@ -300,6 +315,7 @@ class OpenSourceMicroBounty(gl.Contract):
                 "repository_match": repo_match,
                 "issue_match": issue_match,
                 "merged": merged_status,
+                "commit_match": commit_match,
                 "scope_match": scope_match,
                 "verdict": verdict,
                 "verdict_code": verdict_code,
@@ -330,7 +346,7 @@ class OpenSourceMicroBounty(gl.Contract):
             return "MAINTAINER_ONLY"
 
         status = self.bounty_statuses.get(bounty_id, u256(99))
-        if status != u256(2) and status != u256(3):
+        if status != u256(3):
             return "INVALID_STATUS_FOR_APPROVAL"
 
         self.bounty_statuses[bounty_id] = u256(3)  # STATUS_APPROVED
@@ -391,8 +407,8 @@ class OpenSourceMicroBounty(gl.Contract):
             return "MAINTAINER_ONLY"
 
         status = self.bounty_statuses.get(bounty_id, u256(99))
-        if status in [u256(4), u256(6)]:
-            return "CANNOT_REFUND_SETTLED_BOUNTY"
+        if status not in [u256(0), u256(1), u256(5), u256(7), u256(8), u256(9)]:
+            return "REFUND_NOT_ALLOWED_IN_CURRENT_STATE"
 
         reward = self.bounty_rewards.get(bounty_id, u256(0))
         if reward <= u256(0):

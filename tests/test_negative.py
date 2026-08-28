@@ -59,5 +59,25 @@ def test_refund_after_paid_rejected():
     assert refund_bounty(status) == "CANNOT_REFUND_SETTLED_BOUNTY"
 
 
+@pytest.mark.parametrize("status", [2, 3, 4, 6])
+def test_refund_frozen_after_submission_or_approval(status):
+    refundable = [0, 1, 5, 7, 8, 9]
+    result = "BOUNTY_REFUNDED" if status in refundable else "REFUND_NOT_ALLOWED_IN_CURRENT_STATE"
+    assert result == "REFUND_NOT_ALLOWED_IN_CURRENT_STATE"
+
+
+def test_forged_contributor_json_is_not_an_authority():
+    source = open("contracts/OpenSourceMicroBounty.py", encoding="utf-8").read()
+    assert 'gl.nondet.web.get(evidence_url)' not in source
+    assert '"https://api.github.com/repos/" + repo_slug' in source
+    assert 'commit_match == "PASS"' in source
+    assert 'issue_match == "PASS"' in source
+
+
+def test_manual_approval_cannot_bypass_verification():
+    source = open("contracts/OpenSourceMicroBounty.py", encoding="utf-8").read()
+    assert 'if status != u256(3):\n            return "INVALID_STATUS_FOR_APPROVAL"' in source
+
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])

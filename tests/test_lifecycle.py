@@ -102,5 +102,20 @@ def test_refund_path_and_accounting():
     sys.assert_accounting_conservation()
 
 
+def test_approved_bounty_cannot_be_refunded_before_payout():
+    sys = MockBountyContract()
+    sys.create_bounty(2, "0xMaintainer", 1000)
+    sys.claim_bounty(2, "0xContributor")
+    sys.submit_work(2, "0xContributor")
+    sys.set_verified(2, approved=True)
+
+    with pytest.raises(AssertionError):
+        sys.refund_bounty(2, "0xMaintainer")
+
+    assert sys.bounties[2]["status"] == 3
+    assert sys.bounties[2]["reward"] == 1000
+    sys.assert_accounting_conservation()
+
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
