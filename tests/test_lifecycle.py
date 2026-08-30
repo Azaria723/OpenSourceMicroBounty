@@ -1,121 +1,149 @@
-import pytest
+import json
 
 
-class MockBountyContract:
-    def __init__(self):
-        self.bounties = {}
-        self.total_escrowed = 0
-        self.total_paid = 0
-        self.total_refunded = 0
-        self.contract_balance = 0
-
-    def create_bounty(self, bounty_id: int, maintainer: str, reward: int):
-        assert reward > 0
-        self.bounties[bounty_id] = {
-            "maintainer": maintainer,
-            "contributor": None,
-            "reward": reward,
-            "status": 0,  # OPEN
-        }
-        self.total_escrowed += reward
-        self.contract_balance += reward
-
-    def claim_bounty(self, bounty_id: int, contributor: str):
-        b = self.bounties[bounty_id]
-        assert b["status"] == 0
-        assert contributor != b["maintainer"]
-        b["contributor"] = contributor
-        b["status"] = 1  # CLAIMED
-
-    def submit_work(self, bounty_id: int, caller: str):
-        b = self.bounties[bounty_id]
-        assert b["status"] == 1
-        assert caller == b["contributor"]
-        b["status"] = 2  # SUBMITTED
-
-    def set_verified(self, bounty_id: int, approved: bool):
-        b = self.bounties[bounty_id]
-        assert b["status"] == 2
-        b["status"] = 3 if approved else 5  # 3: APPROVED, 5: REJECTED
-
-    def pay_contributor(self, bounty_id: int, caller: str) -> int:
-        b = self.bounties[bounty_id]
-        assert b["status"] == 3  # Must be APPROVED
-        assert caller in [b["maintainer"], b["contributor"]]
-        reward = b["reward"]
-        assert reward > 0
-        assert self.contract_balance >= reward
-
-        b["status"] = 4  # PAID
-        b["reward"] = 0
-        self.total_paid += reward
-        self.contract_balance -= reward
-        return reward
-
-    def refund_bounty(self, bounty_id: int, caller: str) -> int:
-        b = self.bounties[bounty_id]
-        assert b["status"] in [0, 1, 2, 5, 7, 8, 9]
-        assert caller == b["maintainer"]
-        reward = b["reward"]
-        assert reward > 0
-        assert self.contract_balance >= reward
-
-        b["status"] = 6  # REFUNDED
-        b["reward"] = 0
-        self.total_refunded += reward
-        self.contract_balance -= reward
-        return reward
-
-    def assert_accounting_conservation(self):
-        active_locked = sum(b["reward"] for b in self.bounties.values())
-        assert self.contract_balance == active_locked
-        assert self.total_escrowed == (self.total_paid + self.total_refunded + self.contract_balance)
+REPO = "https://github.com/acme/widget"
+ISSUE = REPO + "/issues/1"
+PR = REPO + "/pull/2"
+COMMIT = "a" * 40
+OTHER_COMMIT = "b" * 40
+ISSUE_DIGEST = "1" * 64
+EVIDENCE_DIGEST = "2" * 64
+REWARD = 1_000_000_000_000_000
 
 
-def test_happy_path_payout_and_accounting():
-    sys = MockBountyContract()
-    sys.create_bounty(0, "0xMaintainer", 1000)
-    sys.claim_bounty(0, "0xContributor")
-    sys.submit_work(0, "0xContributor")
-    sys.set_verified(0, approved=True)
-
-    sys.assert_accounting_conservation()
-    payout = sys.pay_contributor(0, "0xContributor")
-    assert payout == 1000
-    assert sys.contract_balance == 0
-    assert sys.total_paid == 1000
-    sys.assert_accounting_conservation()
-
-
-def test_refund_path_and_accounting():
-    sys = MockBountyContract()
-    sys.create_bounty(1, "0xMaintainer", 2500)
-    sys.claim_bounty(1, "0xContributor")
-    sys.submit_work(1, "0xContributor")
-    sys.set_verified(1, approved=False)  # REJECTED
-
-    sys.assert_accounting_conservation()
-    refund = sys.refund_bounty(1, "0xMaintainer")
-    assert refund == 2500
-    assert sys.contract_balance == 0
-    assert sys.total_refunded == 2500
-    sys.assert_accounting_conservation()
+def deploy_funded_bounty(direct_vm, direct_deploy, maintainer):
+    direct_vm.strict_mocks = True
+    direct_vm.check_pickling = True
+    with direct_vm.prank(maintainer):
+        contract = direct_deploy("contracts/OpenSourceMicroBounty.py")
+        direct_vm.value = REWARD
+        bounty_id = contract.create_bounty(
+            "Fix retry handling",
+            "Implement bounded retries for transient failures.",
+            REPO,
+            ISSUE,
+            ISSUE_DIGEST,
+            "retry handling",
+            3600,
+        )
+        direct_vm.value = 0
+    assert bounty_id == 0
+    return contract
 
 
-def test_approved_bounty_cannot_be_refunded_before_payout():
-    sys = MockBountyContract()
-    sys.create_bounty(2, "0xMaintainer", 1000)
-    sys.claim_bounty(2, "0xContributor")
-    sys.submit_work(2, "0xContributor")
-    sys.set_verified(2, approved=True)
-
-    with pytest.raises(AssertionError):
-        sys.refund_bounty(2, "0xMaintainer")
-
-    assert sys.bounties[2]["status"] == 3
-    assert sys.bounties[2]["reward"] == 1000
-    sys.assert_accounting_conservation()
+def submit_as_contributor(direct_vm, contract, contributor, commit=COMMIT):
+    with direct_vm.prank(contributor):
+        assert contract.claim_bounty(0) == "BOUNTY_CLAIMED"
+        assert contract.submit_work(
+            0,
+            PR,
+            commit,
+            "https://attacker.example/forged-approved.json",
+            EVIDENCE_DIGEST,
+            "Contributor-authored text claims everything passed.",
+        ) == "WORK_SUBMITTED"
 
 
-if __name__ == "__main__":
-    pytest.main(["-v", __file__])
+def mock_canonical_github(direct_vm, *, pr_head=COMMIT, commit_sha=COMMIT, merged=True):
+    direct_vm.mock_web(
+        r"https://api\.github\.com/repos/acme/widget/pulls/2$",
+        {
+            "status": 200,
+            "body": json.dumps({
+                "html_url": PR,
+                "merged": merged,
+                "merge_commit_sha": pr_head,
+                "head": {"sha": pr_head},
+                "base": {"repo": {"html_url": REPO}},
+                "title": "Fix retry handling",
+                "body": "Closes #1 and implements retry handling.",
+            }),
+        },
+    )
+    direct_vm.mock_web(
+        r"https://api\.github\.com/repos/acme/widget/commits/[0-9a-f]{40}$",
+        {"status": 200, "body": json.dumps({"sha": commit_sha})},
+    )
+    direct_vm.mock_web(
+        r"https://api\.github\.com/repos/acme/widget/issues/1$",
+        {"status": 200, "body": json.dumps({"html_url": ISSUE})},
+    )
+    direct_vm.mock_web(
+        r"https://api\.github\.com/repos/acme/widget/pulls/2/files$",
+        {"status": 200, "body": json.dumps([{
+            "filename": "src/retry_handler.py",
+            "patch": "+ add bounded retry handling",
+        }])},
+    )
+
+
+def accounting(contract):
+    return json.loads(contract.get_accounting())
+
+
+def bounty(contract):
+    return json.loads(contract.get_bounty(0))
+
+
+def test_forged_contributor_evidence_cannot_override_canonical_github(
+    direct_vm, direct_deploy, direct_alice, direct_bob
+):
+    """A forged claimant URL cannot approve a revision contradicted by GitHub."""
+    contract = deploy_funded_bounty(direct_vm, direct_deploy, direct_alice)
+    submit_as_contributor(direct_vm, contract, direct_bob, COMMIT)
+    before = accounting(contract)
+
+    # GitHub contradicts the self-authored evidence: the PR points at another SHA.
+    mock_canonical_github(direct_vm, pr_head=OTHER_COMMIT, commit_sha=COMMIT)
+    assert int(contract.verify_work(0)) == 5
+
+    record = bounty(contract)
+    verification = json.loads(contract.get_verification(0))
+    diagnostics = json.loads(verification["diagnostics"])
+    after = accounting(contract)
+    assert record["status"] == 5
+    assert record["reward_wei"] == str(REWARD)
+    assert verification["verdict"] == "REJECTED"
+    assert diagnostics["commit_match"] == "FAIL"
+    assert diagnostics["verdict"] == "REJECTED"
+    assert after == before
+    assert after["active_locked_wei"] == str(REWARD)
+
+
+def test_approved_contract_escrow_cannot_be_refunded_and_remains_payable(
+    direct_vm, direct_deploy, direct_alice, direct_bob
+):
+    """Approval freezes refund while preserving exactly one contributor payout."""
+    contract = deploy_funded_bounty(direct_vm, direct_deploy, direct_alice)
+    submit_as_contributor(direct_vm, contract, direct_bob, COMMIT)
+    mock_canonical_github(direct_vm)
+    assert int(contract.verify_work(0)) == 3
+
+    approved_before = bounty(contract)
+    accounting_before = accounting(contract)
+    with direct_vm.prank(direct_alice):
+        assert contract.refund_bounty(0) == "REFUND_NOT_ALLOWED_IN_CURRENT_STATE"
+
+    approved_after = bounty(contract)
+    accounting_after = accounting(contract)
+    assert approved_after == approved_before
+    assert approved_after["status"] == 3
+    assert approved_after["reward_wei"] == str(REWARD)
+    assert accounting_after == accounting_before
+    assert accounting_after["total_refunded_wei"] == "0"
+    assert accounting_after["active_locked_wei"] == str(REWARD)
+
+    with direct_vm.prank(direct_bob):
+        assert contract.pay_contributor(0) == "PAYMENT_RELEASED_TO_CONTRIBUTOR"
+    paid = bounty(contract)
+    final_accounting = accounting(contract)
+    assert paid["status"] == 4
+    assert paid["reward_wei"] == "0"
+    assert final_accounting["total_paid_wei"] == str(REWARD)
+    assert final_accounting["total_refunded_wei"] == "0"
+    assert final_accounting["active_locked_wei"] == "0"
+
+    with direct_vm.prank(direct_bob):
+        assert contract.pay_contributor(0) == "BOUNTY_NOT_APPROVED"
+    with direct_vm.prank(direct_alice):
+        assert contract.refund_bounty(0) == "REFUND_NOT_ALLOWED_IN_CURRENT_STATE"

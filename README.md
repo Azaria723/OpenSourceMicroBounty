@@ -34,7 +34,7 @@ G:\Genlayer Azaria\OpenSourceMicroBounty\
 │   └── OpenSourceMicroBounty.py    # GenLayer Intelligent Contract (Header # v0.2.16, Pure ASCII)
 ├── tests\
 │   ├── test_contract_static.py     # Schema, sanitization & hash tests
-│   ├── test_lifecycle.py           # Happy path & refund invariants
+│   ├── test_lifecycle.py           # Direct contract GitHub-forgery & escrow regressions
 │   ├── test_negative.py            # Security bounds & unauthorized access tests
 │   └── test_differential.py       # Single-field mutation tests
 ├── scripts\
@@ -73,8 +73,15 @@ G:\Genlayer Azaria\OpenSourceMicroBounty\
 ### Run Automated Contract Test Suite
 ```bash
 python -m pytest tests/ -v
-# Output: 13 passed in 0.17s
+# Output: 18 passed
 ```
+
+Two steward-requested regressions deploy and call the submitted contract itself through `genlayer-test` Direct Mode:
+
+- A contributor submits a self-authored HTTPS evidence URL claiming approval while mocked canonical GitHub APIs bind the PR to a different commit. `verify_work` returns `REJECTED`; `commit_match` is `FAIL`; reward and accounting remain locked and unchanged.
+- A canonical merged GitHub PR reaches `APPROVED`. A maintainer refund attempt returns `REFUND_NOT_ALLOWED_IN_CURRENT_STATE` with exact bounty/accounting readback unchanged. Contributor payout then succeeds exactly once; replayed payout and post-payment refund are rejected.
+
+These are contract-level regression tests, not source-string assertions or a parallel mock lifecycle implementation.
 
 ### Run End-to-End Simulation Matrix
 ```bash
