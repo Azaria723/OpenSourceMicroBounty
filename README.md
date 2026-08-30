@@ -2,6 +2,9 @@
 
 `OpenSourceMicroBounty` is a transparent Web3 bounty protocol on GenLayer for open-source development. Maintainers post GitHub issues and lock native GEN into escrow. Contributors claim tasks and submit merged pull requests. GenLayer consensus validators verify GitHub merge evidence on-chain before unlocking payments or processing refunds.
 
+- Studionet contract: `0x93f03f950aAaAaEb5677B506A134F1b04728DE85`
+- Verified Studionet ledger: [`docs/release-evidence.md`](docs/release-evidence.md)
+
 ---
 
 ## 1. Why GenLayer? (GenLayer Fit)
@@ -45,7 +48,8 @@ G:\Genlayer Azaria\OpenSourceMicroBounty\
 │   ├── pay_contributor.py          # Settlement & payout release
 │   ├── refund_bounty.py            # Maintainer refund tool
 │   ├── read_state.py               # On-chain state inspector
-│   └── run_e2e.py                  # 6-Scenario E2E simulation runner
+│   ├── run_e2e.py                  # Local scenario runner
+│   └── run_studionet_security_lifecycle.mjs # Real Studionet security lifecycle
 ├── samples\
 │   ├── sample-pr-merged.json
 │   ├── sample-pr-open-unmerged.json

@@ -241,7 +241,8 @@ class OpenSourceMicroBounty(gl.Contract):
             verdict = "REJECTED"
             verdict_code = 5  # STATUS_REJECTED
 
-            # Canonical sources are derived by the contract, not supplied by a contributor.
+            # GitHub-controlled canonical sources are derived by the contract.
+            # A contributor cannot redirect validators to self-authored JSON.
             fetch_ok = False
             try:
                 pr_api = "https://api.github.com/repos/" + repo_slug + "/pulls/" + pr_number
@@ -270,10 +271,12 @@ class OpenSourceMicroBounty(gl.Contract):
                     head_commit = str(pr_data.get("head", {}).get("sha", "")).lower()
                     issue_html = str(issue_data.get("html_url", "")).rstrip("/").lower()
                     pr_text = (str(pr_data.get("title", "")) + " " + str(pr_data.get("body", ""))).lower()
+                    scope_text = scope_req.strip().lower()
                     canonical_change_text = pr_text
                     for changed_file in files_data:
                         canonical_change_text += " " + str(changed_file.get("filename", "")).lower()
                         canonical_change_text += " " + str(changed_file.get("patch", "")).lower()
+
                     if canonical_repo == repo_url.rstrip("/").lower() and canonical_pr == pr_url.rstrip("/").lower():
                         repo_match = "PASS"
                     if issue_html == issue_url.rstrip("/").lower() and ("#" + issue_number) in pr_text:
@@ -283,7 +286,7 @@ class OpenSourceMicroBounty(gl.Contract):
                     if canonical_commit == expected_commit and expected_commit in [head_commit, merge_commit]:
                         commit_match = "PASS"
                     scope_hits = 0
-                    for scope_word in scope_req.strip().lower().replace(".", " ").replace(",", " ").split():
+                    for scope_word in scope_text.replace(".", " ").replace(",", " ").split():
                         if len(scope_word) >= 5 and scope_word in canonical_change_text:
                             scope_hits += 1
                     if len(files_data) > 0 and scope_hits >= 2:
@@ -346,6 +349,7 @@ class OpenSourceMicroBounty(gl.Contract):
             return "MAINTAINER_ONLY"
 
         status = self.bounty_statuses.get(bounty_id, u256(99))
+        # Verification is authoritative; maintainer cannot bypass it.
         if status != u256(3):
             return "INVALID_STATUS_FOR_APPROVAL"
 
@@ -407,6 +411,7 @@ class OpenSourceMicroBounty(gl.Contract):
             return "MAINTAINER_ONLY"
 
         status = self.bounty_statuses.get(bounty_id, u256(99))
+        # SUBMITTED and APPROVED escrow is frozen until adjudication/payout.
         if status not in [u256(0), u256(1), u256(5), u256(7), u256(8), u256(9)]:
             return "REFUND_NOT_ALLOWED_IN_CURRENT_STATE"
 
