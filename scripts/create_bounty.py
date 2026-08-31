@@ -17,7 +17,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    issue_digest = hashlib.sha256(f"{args.repo}:{args.issue}:{args.scope}".encode("utf-8")).hexdigest()
+    issue_digest = hashlib.sha256(f"{args.repo}\n{args.issue}\n{args.scope}".encode("utf-8")).hexdigest()
     reward_wei = int(args.reward_gen * 1e18)
     deadline_seconds = args.deadline_days * 86400
 

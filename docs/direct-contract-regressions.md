@@ -4,13 +4,13 @@ These steward-requested regressions deploy and call `contracts/OpenSourceMicroBo
 
 ## Forged contributor evidence
 
-The test creates a funded bounty, claims it as a contributor, and submits a self-authored HTTPS JSON URL claiming approval. Contract-derived mocked GitHub APIs then report that the pull request points at a different immutable revision.
+The test creates a funded bounty and proves that contributor-selected hosts and mismatched locator digests are rejected before storage mutation. With a canonical derived GitHub API locator, mocked GitHub APIs then report that the pull request points at a different immutable revision.
 
 Observed assertions:
 
 - `verify_work(0)` returns status `5` (`REJECTED`).
 - `commit_match` is `FAIL`.
-- The attacker-controlled evidence URL is not authoritative.
+- The attacker-controlled evidence URL is rejected before mutation.
 - Reward remains locked.
 - Escrow accounting is unchanged by the rejected adjudication.
 
@@ -38,14 +38,24 @@ Observed assertions:
 - Bob, the stored bounty creator/funder, can refund.
 - Refund transfers to the fixed maintainer recipient, clears the reward, records status `6`, and conserves accounting.
 
+## Additional direct security regressions
+
+- Deployment ownership grants no approve, reject, payout, or refund authority over a bounty created by another wallet.
+- The real maintainer cannot convert `SUBMITTED` directly to `REJECTED`; validator adjudication is required.
+- `CLAIMED` escrow cannot be refunded. The exact deadline boundary is enforced, expiry is permissionless, and only the creator/funder receives the eventual refund.
+- A GitHub outage yields retriable `UNAVAILABLE`; refund remains blocked and recovery can approve the same submission.
+- Repository, issue, and PR URLs use exact canonical grammar; issue `#1` does not match `#10`.
+- Scope approval is a consequential consensus output, not a source-string keyword count.
+- Invalid payable creation raises and preserves exact record/accounting snapshots.
+
 ## Reproduction
 
 ```powershell
 python -m pytest tests/test_lifecycle.py -q -p no:cacheprovider
-# 3 passed
+# 9 passed
 
 python -m pytest tests -q -p no:cacheprovider
-# 19 passed
+# 25 passed
 
 $env:PYTHONIOENCODING='utf-8'
 genvm-lint check contracts/OpenSourceMicroBounty.py

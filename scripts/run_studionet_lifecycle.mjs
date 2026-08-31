@@ -20,30 +20,42 @@ const write = async (account, functionName, args, value) => {
   console.log(`${functionName}: ${hash}`);
   if (process.env.FIRE_AND_FORGET === "1") return hash;
   const receipt = await wait(hash);
-  console.log(JSON.stringify(receipt));
+  console.log(`${functionName}_status=${receipt.status_name || receipt.status}`);
   return hash;
 };
 
 const repo = "https://github.com/Azaria723/OpenSourceMicroBounty";
 const issue = `${repo}/issues/1`;
-const scope = "Add a deterministic evidence fixture and document the bounty lifecycle.";
-const issueDigest = sha256("sha256").update(`${repo}:${issue}:${scope}`).digest("hex");
-const evidenceUrl = "https://raw.githubusercontent.com/Azaria723/OpenSourceMicroBounty/main/live-bounty-demo.json";
-const evidenceDigest = "f0bac694018675a3b25ebd08ede5a8113058c13016b6f8a103c03867d3cf3356";
+const scope = "Canonical GitHub verification and escrow refund safety.";
+const issueDigest = sha256("sha256").update(`${repo}\n${issue}\n${scope}`).digest("hex");
+const evidenceUrl = "https://api.github.com/repos/Azaria723/OpenSourceMicroBounty/pulls/2";
+const evidenceDigest = sha256("sha256").update(evidenceUrl).digest("hex");
 const amount = BigInt(Math.round(Number(rewardGen) * 1e18));
 
 console.log(`maintainer=${maintainer.address}`);
 console.log(`contributor=${contributor.address}`);
 console.log(`contract=${contract}`);
 const bountyId = BigInt(process.env.BOUNTY_ID || "0");
+const step = process.env.STEP || "";
+if (step === "create") await write(maintainer, "create_bounty", ["Harden canonical GitHub verification", "Verify canonical GitHub facts and freeze approved escrow before payout.", repo, issue, issueDigest, scope, 86400n], amount);
+if (step === "claim") await write(contributor, "claim_bounty", [bountyId]);
+if (step === "submit") await write(contributor, "submit_work", [bountyId, `${repo}/pull/2`, "0fdaccecf5f56a9ba0efa20789022751a1933776", evidenceUrl, evidenceDigest, "Merged canonical GitHub verification documentation and escrow refund safety evidence."]);
+if (step === "verify") await write(contributor, "verify_work", [bountyId]);
+if (step === "refund") await write(maintainer, "refund_bounty", [bountyId]);
+if (step === "approve") await write(maintainer, "approve_work", [bountyId]);
+if (step === "pay") await write(maintainer, "pay_contributor", [bountyId]);
+if (step.length > 0) process.exit(0);
 let createHash = "skipped";
 if (process.env.SKIP_CREATE !== "1") {
-  createHash = await write(maintainer, "create_bounty", ["Improve retry handling", "Add a deterministic evidence fixture and document the bounty lifecycle.", repo, issue, issueDigest, scope, 86400n], amount);
+  createHash = await write(maintainer, "create_bounty", ["Harden canonical GitHub verification", "Verify canonical GitHub facts and freeze approved escrow before payout.", repo, issue, issueDigest, scope, 86400n], amount);
 }
 if (process.env.ONLY_SETTLE !== "1") {
   await write(contributor, "claim_bounty", [bountyId]);
-  await write(contributor, "submit_work", [bountyId, `${repo}/pull/2`, "0123456789abcdef0123456789abcdef01234567", evidenceUrl, evidenceDigest, "Added deterministic lifecycle evidence."]);
+  await write(contributor, "submit_work", [bountyId, `${repo}/pull/2`, "0fdaccecf5f56a9ba0efa20789022751a1933776", evidenceUrl, evidenceDigest, "Merged canonical GitHub verification documentation and escrow refund safety evidence."]);
   await write(contributor, "verify_work", [bountyId]);
+}
+if (process.env.TEST_REFUND_GUARD === "1") {
+  await write(maintainer, "refund_bounty", [bountyId]);
 }
 await write(maintainer, "approve_work", [bountyId]);
 await write(maintainer, "pay_contributor", [bountyId]);

@@ -15,8 +15,13 @@ The contract acts strictly as an automated, evidence-bound financial escrow rail
 | **Unmerged Work Exploitation** | Submitting an open or closed unmerged PR | Consensus validator strictly verifies `merged == true` |
 | **Tampered Evidence Payload** | Changing payload bytes post-commitment | Cryptographic SHA-256 digest verification before web fetch |
 | **Double Payout Replay** | Replaying payment method on an approved task | State mutates to `PAID` and reward zeroed before transfer |
-| **GitHub Server Outage** | Temporary 500 error on GitHub | Routes to `UNAVAILABLE`; enables retry or maintainer refund |
+| **GitHub Server Outage** | Temporary 500 error on GitHub | Routes to retriable `UNAVAILABLE`; escrow stays frozen and becomes expirable only after the deadline |
 | **Global Owner Refund Override** | Contract deployer refunds a bounty they did not create or fund | Removed owner override; only the bounty's stored maintainer may call `refund_bounty` |
+| **Claimed-bounty Rug** | Creator refunds after a contributor has claimed work | `CLAIMED` is not refundable; permissionless expiry requires the real deadline to pass |
+| **Manual Rejection Bypass** | Maintainer marks submitted work rejected to unlock a refund | Only validator adjudication can create `REJECTED`; direct rejection before that is rejected |
+| **Evidence Redirect / Weak Digest** | Contributor points validators at self-authored evidence or supplies an unrelated digest | Contract derives the exact GitHub API locator and checks SHA-256 identity bindings before mutation |
+| **Issue Prefix Collision** | PR text mentioning `#10` is treated as linking issue `#1` | Exact numeric-boundary or canonical full-URL matching |
+| **Invalid Payable Input** | Failed creation succeeds after GEN is attached | Validation raises `UserError`, reverting the call and attached GEN atomically |
 
 ---
 

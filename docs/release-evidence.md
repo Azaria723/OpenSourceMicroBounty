@@ -1,5 +1,7 @@
 # Studionet E2E evidence — OpenSourceMicroBounty
 
+> Historical record: these transactions belong to a superseded contract revision. The current hardened source requires a new deployment and fresh on-chain lifecycle evidence before resubmission.
+
 This ledger records only calls actually finalized and state actually read from the deployed contract.
 
 ## Deployment and canonical resources

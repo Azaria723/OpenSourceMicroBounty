@@ -11,8 +11,6 @@ export default function SubmitWorkPage({ bountyId, bounties, onSubmitWork, setAc
   const [formData, setFormData] = useState({
     prUrl: '',
     commitSha: '',
-    evidenceUrl: '',
-    evidenceDigest: '',
     summary: '',
   });
 
@@ -22,10 +20,8 @@ export default function SubmitWorkPage({ bountyId, bounties, onSubmitWork, setAc
 
   const isRepoMatch = formData.prUrl.toLowerCase().startsWith(bounty.repository_url?.toLowerCase() || '');
   const isCommitValid = /^[a-fA-F0-9]{40}$/.test(formData.commitSha.trim());
-  const isDigestValid = /^[a-fA-F0-9]{64}$/.test(formData.evidenceDigest.trim());
-  const isUrlValid = formData.evidenceUrl.startsWith('https://');
-
-  const canSubmit = isRepoMatch && isCommitValid && isDigestValid && isUrlValid && formData.summary.trim().length > 0;
+  const isCanonicalPr = /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+$/.test(formData.prUrl.trim());
+  const canSubmit = isRepoMatch && isCanonicalPr && isCommitValid && formData.summary.trim().length > 0;
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -72,7 +68,7 @@ export default function SubmitWorkPage({ bountyId, bounties, onSubmitWork, setAc
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <div className="space-y-1.5">
               <label className="block text-xs font-semibold text-deepInk">Commit SHA (40-char Hex) *</label>
               <input
@@ -85,29 +81,10 @@ export default function SubmitWorkPage({ bountyId, bounties, onSubmitWork, setAc
               />
             </div>
 
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-deepInk">Evidence Payload URL *</label>
-              <input
-                type="url"
-                placeholder="https://raw.githubusercontent.com/..."
-                value={formData.evidenceUrl}
-                onChange={(e) => handleChange('evidenceUrl', e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-bgMain border border-borderLine rounded-xl text-xs font-mono focus:outline-none focus:border-violetAccent"
-                required
-              />
-            </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-deepInk">Evidence SHA-256 Digest (64-char Hex) *</label>
-            <input
-              type="text"
-              placeholder="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-              value={formData.evidenceDigest}
-              onChange={(e) => handleChange('evidenceDigest', e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-bgMain border border-borderLine rounded-xl text-xs font-mono focus:outline-none focus:border-violetAccent"
-              required
-            />
+          <div className="p-3 rounded-xl bg-lavenderSoft/50 text-[11px] text-mutedText">
+            The canonical GitHub API locator and its SHA-256 binding are derived automatically from the pull request URL. Contributors cannot select an evidence host.
           </div>
 
           <div className="space-y-1.5">
@@ -135,13 +112,13 @@ export default function SubmitWorkPage({ bountyId, bounties, onSubmitWork, setAc
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>40-Hex Commit SHA valid</span>
             </div>
-            <div className={`flex items-center space-x-1.5 ${isDigestValid ? 'text-greenStatus' : 'text-mutedText'}`}>
+            <div className={`flex items-center space-x-1.5 ${isCanonicalPr ? 'text-greenStatus' : 'text-mutedText'}`}>
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>64-Hex SHA-256 Digest</span>
+              <span>Canonical PR identity</span>
             </div>
-            <div className={`flex items-center space-x-1.5 ${isUrlValid ? 'text-greenStatus' : 'text-mutedText'}`}>
+            <div className={`flex items-center space-x-1.5 ${isCanonicalPr ? 'text-greenStatus' : 'text-mutedText'}`}>
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>HTTPS Evidence URL</span>
+              <span>Evidence locator derived</span>
             </div>
           </div>
         </div>

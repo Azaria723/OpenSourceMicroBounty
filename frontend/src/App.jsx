@@ -108,7 +108,7 @@ export default function App() {
       const deadlineSec = BigInt(Number(formData.deadlineDays) * 86400);
 
       const encoder = new TextEncoder();
-      const issueBytes = encoder.encode(`${formData.repositoryUrl}:${formData.issueUrl}:${formData.requiredScope}`);
+      const issueBytes = encoder.encode(`${formData.repositoryUrl}\n${formData.issueUrl}\n${formData.requiredScope}`);
       const hashBuffer = await crypto.subtle.digest("SHA-256", issueBytes);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const issueDigest = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
@@ -200,6 +200,16 @@ export default function App() {
 
     try {
       const client = writer(account);
+      const pr = new URL(formData.prUrl);
+      const parts = pr.pathname.replace(/^\/+|\/+$/g, '').split('/');
+      if (pr.protocol !== 'https:' || pr.hostname !== 'github.com' || parts.length !== 4 || parts[2] !== 'pull' || !/^\d+$/.test(parts[3])) {
+        throw new Error('Pull request URL must be exactly https://github.com/<owner>/<repo>/pull/<number>.');
+      }
+      const evidenceUrl = `https://api.github.com/repos/${parts[0]}/${parts[1]}/pulls/${parts[3]}`;
+      const evidenceBytes = new TextEncoder().encode(evidenceUrl);
+      const evidenceHash = await crypto.subtle.digest('SHA-256', evidenceBytes);
+      const evidenceDigest = Array.from(new Uint8Array(evidenceHash))
+        .map((byte) => byte.toString(16).padStart(2, '0')).join('');
       const txHash = await client.writeContract({
         address: CONTRACT,
         functionName: 'submit_work',
@@ -207,8 +217,8 @@ export default function App() {
           BigInt(bountyId),
           formData.prUrl,
           formData.commitSha,
-          formData.evidenceUrl,
-          formData.evidenceDigest,
+          evidenceUrl,
+          evidenceDigest,
           formData.summary,
         ],
       });

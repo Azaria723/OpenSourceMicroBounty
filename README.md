@@ -3,7 +3,7 @@
 `OpenSourceMicroBounty` is a transparent Web3 bounty protocol on GenLayer for open-source development. Maintainers post GitHub issues and lock native GEN into escrow. Contributors claim tasks and submit merged pull requests. GenLayer consensus validators verify GitHub merge evidence on-chain before unlocking payments or processing refunds.
 
 - Studionet contract: `0x93f03f950aAaAaEb5677B506A134F1b04728DE85`
-- Verified Studionet ledger: [`docs/release-evidence.md`](docs/release-evidence.md)
+- Historical Studionet ledger for the superseded deployment: [`docs/release-evidence.md`](docs/release-evidence.md)
 
 ---
 
@@ -13,7 +13,7 @@ Traditional smart contracts cannot verify whether an off-chain GitHub pull reque
 
 `OpenSourceMicroBounty` leverages GenLayer's **Decentralized Web & Code Consensus**:
 - Validators directly fetch and parse public GitHub PR and commit metadata over HTTPS without centralized API keys.
-- Cryptographic SHA-256 evidence digests ensure submission integrity.
+- SHA-256 identity bindings make the registered issue tuple and contract-derived evidence locator consequential.
 - Closed categorical enums (`repository_match`, `issue_match`, `merged`, `scope_match`) ensure deterministic consensus outcomes.
 
 ---
@@ -76,15 +76,20 @@ G:\Genlayer Azaria\OpenSourceMicroBounty\
 
 ### Run Automated Contract Test Suite
 ```bash
-python -m pytest tests/ -v
-# Output: 19 passed
+python -m pytest tests/ -q -p no:cacheprovider
+# Output: 25 passed
 ```
 
 Two steward-requested regressions deploy and call the submitted contract itself through `genlayer-test` Direct Mode:
 
-- A contributor submits a self-authored HTTPS evidence URL claiming approval while mocked canonical GitHub APIs bind the PR to a different commit. `verify_work` returns `REJECTED`; `commit_match` is `FAIL`; reward and accounting remain locked and unchanged.
+- A contributor cannot select the evidence host: the contract derives the canonical GitHub API locator from the registered repository and PR. Noncanonical locators and mismatched binding digests are rejected before mutation.
+- Canonical GitHub APIs binding the PR to a different commit produce `REJECTED`; `commit_match` is `FAIL`; reward and accounting remain locked and unchanged.
 - A canonical merged GitHub PR reaches `APPROVED`. A maintainer refund attempt returns `REFUND_NOT_ALLOWED_IN_CURRENT_STATE` with exact bounty/accounting readback unchanged. Contributor payout then succeeds exactly once; replayed payout and post-payment refund are rejected.
 - Refund authority is scoped to the creator/funder stored on that bounty. A separate protocol deployer/owner and an unrelated wallet both receive `MAINTAINER_ONLY`, with exact bounty and accounting state unchanged; only the bounty creator can complete the refund.
+- A claimed bounty cannot be refunded before its real deadline. After the deadline, permissionless expiry enables only the original creator/funder to reclaim it.
+- A transient GitHub outage produces retriable `UNAVAILABLE`; escrow remains frozen and cannot be refunded. Recovery can move the same submission to `APPROVED`.
+- Direct calls prove the deployer has no approve, reject, payout, or refund authority over user-created bounties, and maintainers cannot bypass validator rejection.
+- Invalid payable creation raises `UserError`, leaving records and accounting unchanged so attached GEN reverts atomically.
 
 These are contract-level regression tests, not source-string assertions or a parallel mock lifecycle implementation.
 
