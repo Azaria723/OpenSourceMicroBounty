@@ -77,13 +77,14 @@ G:\Genlayer Azaria\OpenSourceMicroBounty\
 ### Run Automated Contract Test Suite
 ```bash
 python -m pytest tests/ -v
-# Output: 18 passed
+# Output: 19 passed
 ```
 
 Two steward-requested regressions deploy and call the submitted contract itself through `genlayer-test` Direct Mode:
 
 - A contributor submits a self-authored HTTPS evidence URL claiming approval while mocked canonical GitHub APIs bind the PR to a different commit. `verify_work` returns `REJECTED`; `commit_match` is `FAIL`; reward and accounting remain locked and unchanged.
 - A canonical merged GitHub PR reaches `APPROVED`. A maintainer refund attempt returns `REFUND_NOT_ALLOWED_IN_CURRENT_STATE` with exact bounty/accounting readback unchanged. Contributor payout then succeeds exactly once; replayed payout and post-payment refund are rejected.
+- Refund authority is scoped to the creator/funder stored on that bounty. A separate protocol deployer/owner and an unrelated wallet both receive `MAINTAINER_ONLY`, with exact bounty and accounting state unchanged; only the bounty creator can complete the refund.
 
 These are contract-level regression tests, not source-string assertions or a parallel mock lifecycle implementation.
 

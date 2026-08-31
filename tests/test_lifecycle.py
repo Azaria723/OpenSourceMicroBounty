@@ -147,3 +147,52 @@ def test_approved_contract_escrow_cannot_be_refunded_and_remains_payable(
         assert contract.pay_contributor(0) == "BOUNTY_NOT_APPROVED"
     with direct_vm.prank(direct_alice):
         assert contract.refund_bounty(0) == "REFUND_NOT_ALLOWED_IN_CURRENT_STATE"
+
+
+def test_only_bounty_creator_can_trigger_refund_even_when_caller_is_contract_owner(
+    direct_vm, direct_deploy, direct_alice, direct_bob, direct_charlie
+):
+    """Contract ownership must never grant refund authority over another user's bounty."""
+    direct_vm.strict_mocks = True
+    direct_vm.check_pickling = True
+
+    # Alice deploys the protocol, but Bob independently creates and funds bounty 0.
+    with direct_vm.prank(direct_alice):
+        contract = direct_deploy("contracts/OpenSourceMicroBounty.py")
+    direct_vm.value = REWARD
+    with direct_vm.prank(direct_bob):
+        assert contract.create_bounty(
+            "Fix retry handling",
+            "Implement bounded retries for transient failures.",
+            REPO,
+            ISSUE,
+            ISSUE_DIGEST,
+            "retry handling",
+            3600,
+        ) == 0
+    direct_vm.value = 0
+
+    initial_bounty = bounty(contract)
+    initial_accounting = accounting(contract)
+    assert initial_bounty["maintainer"].lower() != str(direct_alice).lower()
+
+    # Neither the protocol deployer/owner nor an unrelated wallet participated.
+    with direct_vm.prank(direct_alice):
+        assert contract.refund_bounty(0) == "MAINTAINER_ONLY"
+    assert bounty(contract) == initial_bounty
+    assert accounting(contract) == initial_accounting
+
+    with direct_vm.prank(direct_charlie):
+        assert contract.refund_bounty(0) == "MAINTAINER_ONLY"
+    assert bounty(contract) == initial_bounty
+    assert accounting(contract) == initial_accounting
+
+    # Only Bob, the creator/funder stored for this bounty, can trigger refund.
+    with direct_vm.prank(direct_bob):
+        assert contract.refund_bounty(0) == "BOUNTY_REFUNDED_TO_MAINTAINER"
+    refunded = bounty(contract)
+    final_accounting = accounting(contract)
+    assert refunded["status"] == 6
+    assert refunded["reward_wei"] == "0"
+    assert final_accounting["total_refunded_wei"] == str(REWARD)
+    assert final_accounting["active_locked_wei"] == "0"

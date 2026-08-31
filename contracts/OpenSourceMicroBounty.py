@@ -407,7 +407,9 @@ class OpenSourceMicroBounty(gl.Contract):
         if bounty_id >= self.bounty_count:
             return "BOUNTY_NOT_FOUND"
         maintainer = self.bounty_maintainers[bounty_id]
-        if gl.message.sender_address != maintainer and gl.message.sender_address != self.owner:
+        # Contract ownership does not grant control over user-funded bounties.
+        # Only the bounty's stored creator/funder can authorize its refund.
+        if gl.message.sender_address != maintainer:
             return "MAINTAINER_ONLY"
 
         status = self.bounty_statuses.get(bounty_id, u256(99))

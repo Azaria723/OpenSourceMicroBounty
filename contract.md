@@ -16,6 +16,7 @@ The contract acts strictly as an automated, evidence-bound financial escrow rail
 | **Tampered Evidence Payload** | Changing payload bytes post-commitment | Cryptographic SHA-256 digest verification before web fetch |
 | **Double Payout Replay** | Replaying payment method on an approved task | State mutates to `PAID` and reward zeroed before transfer |
 | **GitHub Server Outage** | Temporary 500 error on GitHub | Routes to `UNAVAILABLE`; enables retry or maintainer refund |
+| **Global Owner Refund Override** | Contract deployer refunds a bounty they did not create or fund | Removed owner override; only the bounty's stored maintainer may call `refund_bounty` |
 
 ---
 

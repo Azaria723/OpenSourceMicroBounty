@@ -26,14 +26,26 @@ Observed assertions:
 - Contributor payout succeeds once.
 - A second payout and post-payment refund are rejected.
 
+## Creator-bound refund authority
+
+The regression deploys the protocol with Alice, then creates and funds bounty `0` with Bob so the protocol owner and bounty maintainer are deliberately different actors.
+
+Observed assertions:
+
+- Alice, the contract deployer/owner, receives `MAINTAINER_ONLY`.
+- Charlie, an unrelated wallet, receives `MAINTAINER_ONLY`.
+- Both rejected calls preserve the exact bounty record and accounting snapshot.
+- Bob, the stored bounty creator/funder, can refund.
+- Refund transfers to the fixed maintainer recipient, clears the reward, records status `6`, and conserves accounting.
+
 ## Reproduction
 
 ```powershell
 python -m pytest tests/test_lifecycle.py -q -p no:cacheprovider
-# 2 passed
+# 3 passed
 
 python -m pytest tests -q -p no:cacheprovider
-# 18 passed
+# 19 passed
 
 $env:PYTHONIOENCODING='utf-8'
 genvm-lint check contracts/OpenSourceMicroBounty.py
