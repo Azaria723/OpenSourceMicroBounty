@@ -4,6 +4,7 @@
 
 - Studionet contract: `0x93f03f950aAaAaEb5677B506A134F1b04728DE85`
 - Historical Studionet ledger for the superseded deployment: [`docs/release-evidence.md`](docs/release-evidence.md)
+- Hardened contract lifecycle and custody evidence: [`docs/studionet-hardening-evidence.md`](docs/studionet-hardening-evidence.md)
 
 ---
 
