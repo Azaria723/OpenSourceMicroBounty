@@ -41,7 +41,10 @@ if (step === "create") await write(maintainer, "create_bounty", ["Harden canonic
 if (step === "claim") await write(contributor, "claim_bounty", [bountyId]);
 if (step === "submit") await write(contributor, "submit_work", [bountyId, `${repo}/pull/2`, "0fdaccecf5f56a9ba0efa20789022751a1933776", evidenceUrl, evidenceDigest, "Merged canonical GitHub verification documentation and escrow refund safety evidence."]);
 if (step === "verify") await write(contributor, "verify_work", [bountyId]);
-if (step === "refund") await write(maintainer, "refund_bounty", [bountyId]);
+if (step === "refund") {
+  const refundCaller = process.env.CALLER === "contributor" ? contributor : maintainer;
+  await write(refundCaller, "refund_bounty", [bountyId]);
+}
 if (step === "approve") await write(maintainer, "approve_work", [bountyId]);
 if (step === "pay") await write(maintainer, "pay_contributor", [bountyId]);
 if (step.length > 0) process.exit(0);

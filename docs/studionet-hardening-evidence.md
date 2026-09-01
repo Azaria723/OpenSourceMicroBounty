@@ -44,7 +44,7 @@ Source commit: [`d074e1259e8d9b89f2bf8a1f0adcaaa2951ff4bb`](https://github.com/A
 }
 ```
 
-## Final custody readback
+## Paid lifecycle custody readback (before isolated refund regression)
 
 ```json
 {
@@ -54,6 +54,27 @@ Source commit: [`d074e1259e8d9b89f2bf8a1f0adcaaa2951ff4bb`](https://github.com/A
   "total_escrowed_wei": "1000000000000000",
   "total_paid_wei": "1000000000000000",
   "total_refunded_wei": "0"
+}
+```
+
+## Exact steward-reported unauthorized-refund regression
+
+A second funded bounty was created and left `OPEN`. The second wallet had not claimed, submitted, funded, or otherwise participated in that bounty.
+
+| Check | Transaction | Verified result |
+|---|---|---|
+| Create and fund bounty `1` | [`0x6265...69b4`](https://explorer-studio.genlayer.com/transactions/0x62657064a44dc9fa718042cd0e069a95d725484409e2294fdc6bcd3eef8f69b4) | Status `OPEN`; `0.001 GEN` locked |
+| Non-participant attempts refund | [`0xc875...4ad1`](https://explorer-studio.genlayer.com/transactions/0xc8757124093c2e17f0cc4f9c0b6c7c643da8b3519f18800d11d2dc87de224ad1) | State stayed `OPEN`, reward stayed `0.001 GEN`, `total_refunded_wei` stayed `0` |
+| Stored creator/funder refunds | [`0x0deb...c395`](https://explorer-studio.genlayer.com/transactions/0x0debd65d1ca231ac035777d00a08989f63b495ef25176a46ead9a4189779c395) | Status `REFUNDED`; the test escrow returned only to its fixed creator/funder |
+
+Final global accounting after both scenarios:
+
+```json
+{
+  "active_locked_wei": "0",
+  "total_escrowed_wei": "2000000000000000",
+  "total_paid_wei": "1000000000000000",
+  "total_refunded_wei": "1000000000000000"
 }
 ```
 
